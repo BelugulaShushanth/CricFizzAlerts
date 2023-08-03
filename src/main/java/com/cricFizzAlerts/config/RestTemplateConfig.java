@@ -30,7 +30,6 @@ public class RestTemplateConfig {
         return restTemplate;
     }
 
-    @Bean
     public ObjectMapper getObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
