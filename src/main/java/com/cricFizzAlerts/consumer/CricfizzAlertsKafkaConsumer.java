@@ -2,6 +2,7 @@ package com.cricFizzAlerts.consumer;
 
 import com.cricFizzAlerts.bean.alert.AlertDetails;
 import com.cricFizzAlerts.bean.matchScoreCard.MatchScoreCard;
+import com.cricFizzAlerts.repository.AlertsRepository;
 import com.cricFizzAlerts.services.CricbuzzService;
 import com.cricFizzAlerts.utils.CricAlertUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -22,13 +23,16 @@ public class CricfizzAlertsKafkaConsumer {
     @Autowired
     private CricbuzzService cricbuzzService;
 
+    @Autowired
+    private AlertsRepository alertsRepository;
+
     @KafkaListener(topics = "${spring.kafka.topic-name}", groupId = "${spring.kafka.consumer.group-id}")
     public void consumeAlertDetails(String alertDetailsJson){
         try {
             AlertDetails alertDetails = cricAlertUtils.objectMapper().readValue(alertDetailsJson, AlertDetails.class);
             logger.info("Alert Received: {}",alertDetails.getAlertId());
+            alertsRepository.save(alertDetails);
             MatchScoreCard matchesScoreCard = cricbuzzService.getMatchesScoreCard(alertDetails.getMatchId());
-            logger.info("matchesScoreCard: {}",cricAlertUtils.objectMapper().writeValueAsString(matchesScoreCard));
         } catch (JsonProcessingException e) {
             logger.error("Exception in parsing alertDetailsJson: {}",e.getMessage());
         }
