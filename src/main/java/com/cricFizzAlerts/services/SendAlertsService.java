@@ -27,6 +27,9 @@ public class SendAlertsService {
     @Value("${mail.score.body}")
     private String finalBody;
 
+    @Value("${style.grey}")
+    private String styleGrey;
+
     @Autowired
     private CricbuzzService cricbuzzService;
 
@@ -86,21 +89,46 @@ public class SendAlertsService {
 
         if (alertDetails.getMatchType().equalsIgnoreCase("live") && !matchesScoreCard.getScoreCard().isEmpty()) {
 
-            body.append(matchesScoreCard.getMatchHeader().getTeam1().getName()).append(" vs ")
-                    .append(matchesScoreCard.getMatchHeader().getTeam2().getName()).append("\n ");
+            body.append("\n <b><h3 style='colour: blue'>")
+                .append(matchesScoreCard.getMatchHeader().getTeam1().getName()).append(" vs ")
+                .append(matchesScoreCard.getMatchHeader().getTeam2().getName()).append("</h3></b>");
 
-            body.append(matchesScoreCard.getMatchHeader().getTeam1().getShortName()).append(" ")
+            body.append("\n <h3><b>")
+                    .append(matchesScoreCard.getMatchHeader().getTeam1().getShortName())
+                    .append("</b>  ")
+                    .append("<label ").append(styleGrey+">")
                     .append(getScore(matchesScoreCard, 0));
 
             if (matchSize > 2) {
-                body.append(" & ").append(getScore(matchesScoreCard, 2));
+                body.append(" & ")
+                        .append(getScore(matchesScoreCard, 2))
+                        .append("</label>")
+                        .append("</h3>");
             }
+            else{
+                body.append("</label>")
+                        .append("</h3>");
+            }
+
+
             if (matchSize > 1) {
-                body.append("\n ").append(matchesScoreCard.getMatchHeader().getTeam2().getShortName())
-                        .append("  ").append(getScore(matchesScoreCard, 1));
+                body.append("\n")
+                        .append("<h3><b>")
+                        .append(matchesScoreCard.getMatchHeader().getTeam2().getShortName())
+                        .append("</b>  ")
+                        .append("<label ").append(styleGrey+">")
+                        .append(getScore(matchesScoreCard, 1));
             }
+
             if (matchSize > 3) {
-                body.append(" & ").append(getScore(matchesScoreCard, 3));
+                body.append(" & ")
+                        .append(getScore(matchesScoreCard, 3))
+                        .append("</label>")
+                        .append("</h3>");
+            }
+            else{
+                body.append("</label>")
+                        .append("</h3>");
             }
         }
         return body;
