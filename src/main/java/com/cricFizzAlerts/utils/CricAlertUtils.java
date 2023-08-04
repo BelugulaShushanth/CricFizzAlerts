@@ -11,6 +11,12 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -55,6 +61,26 @@ public class CricAlertUtils {
             logger.error("Exception in CricUtils:readJsonFile", e);
         }
         return jsonString.toString();
+    }
+
+    public Long findTimeDifference(Long matchStartDT){
+        Instant instant = Instant.ofEpochMilli(matchStartDT);
+
+        long matchStartMills = ZonedDateTime.ofInstant(instant, ZoneId.of("Asia/Kolkata"))
+                .toInstant().toEpochMilli();
+        long currentMills = LocalDateTime.now().atZone(ZoneId.of("Asia/Kolkata"))
+                .toInstant().toEpochMilli();
+
+        return matchStartMills - currentMills;
+    }
+
+    public String mapMillsToDateTime(Long timeMills) {
+        String dateTime = null;
+        Instant instant = Instant.ofEpochMilli(timeMills);
+        ZonedDateTime zonedDateTime = ZonedDateTime.ofInstant(instant, ZoneId.of("Asia/Kolkata"));
+        dateTime = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.LONG).format(zonedDateTime);
+        dateTime = dateTime.replace(":00 ","");
+        return dateTime;
     }
 
 

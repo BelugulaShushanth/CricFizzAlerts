@@ -5,6 +5,7 @@ import com.cricFizzAlerts.bean.mail.MailBean;
 import com.cricFizzAlerts.bean.matchScoreCard.MatchScoreCard;
 import com.cricFizzAlerts.client.MailClient;
 import com.cricFizzAlerts.repository.AlertsRepository;
+import com.cricFizzAlerts.utils.CricAlertUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -39,7 +44,10 @@ public class SendAlertsService {
     @Autowired
     private AlertsRepository alertsRepository;
 
-    @Async
+    @Autowired
+    private CricAlertUtils cricAlertUtils;
+
+    //@Async
     public void scheduleMailAlerts(AlertDetails alertDetails) {
 
         TimerTask task = new TimerTask() {
@@ -51,6 +59,9 @@ public class SendAlertsService {
                         if(alertDetails.getMatchType().equalsIgnoreCase("live") ) {
                             sendMailAlert(alertDetails);
                         }
+                        else if (alertDetails.getMatchType().equalsIgnoreCase("upcoming")){
+                            sendMailAlert(alertDetails);
+                        }
                     }
                 }
                 else{
@@ -60,7 +71,21 @@ public class SendAlertsService {
         };
 
         Timer timer = new Timer();
-        timer.scheduleAtFixedRate(task, 0,alertDetails.getTimePeriod() * 60000);
+        if (alertDetails.getMatchType().equalsIgnoreCase("upcoming")){
+
+            long timeDifference = cricAlertUtils.findTimeDifference(alertDetails.getMatchStartDT());
+
+            timer.scheduleAtFixedRate(task, timeDifference,alertDetails.getTimePeriod() * 60000);
+
+            logger.info("Alert Scheduled for alertId {} and it starts at Date {} In Mills {}"
+                                                        ,alertDetails.getAlertId()
+                                                        ,cricAlertUtils.mapMillsToDateTime(alertDetails.getMatchStartDT())
+                                                        ,timeDifference);
+        }
+        else{
+            timer.scheduleAtFixedRate(task, 0,alertDetails.getTimePeriod() * 60000);
+            logger.info("Alert Scheduled for alertId {} and it starts now",alertDetails.getAlertId());
+        }
 
     }
 
@@ -73,21 +98,26 @@ public class SendAlertsService {
         MailBean mailBean = new MailBean();
         mailBean.setToMailId(mailId.toString());
         mailBean.setSubject(subject.replace("alertType", alertDetails.getAlertType()));
-        mailBean.setBody(getBody(finalBody, alertDetails, matchesScoreCard).toString());
 
-        ResponseEntity<String> response = mailClient.sendMail(mailBean);
+        StringBuffer mailBody = getBody(finalBody, matchesScoreCard);
 
-        if (response.getStatusCode().is2xxSuccessful()) {
-            logger.info("Alert {} sent successfully to {}", alertDetails.getAlertId(), alertDetails.getMailId());
+        if(mailBody != null) {
+            mailBean.setBody(mailBody.toString());
+            ResponseEntity<String> response = mailClient.sendMail(mailBean);
+            if (response.getStatusCode().is2xxSuccessful()) {
+                logger.info("Alert {} sent successfully to {}", alertDetails.getAlertId(), alertDetails.getMailId());
+            }
         }
     }
 
-    private StringBuffer getBody(String finalBody, AlertDetails alertDetails, MatchScoreCard matchesScoreCard) {
+    private StringBuffer getBody(String finalBody, MatchScoreCard matchesScoreCard) {
 
         StringBuffer body = new StringBuffer(finalBody);
         int matchSize = matchesScoreCard.getScoreCard().size();
 
-        if (alertDetails.getMatchType().equalsIgnoreCase("live") && !matchesScoreCard.getScoreCard().isEmpty()) {
+        if (!matchesScoreCard.getScoreCard().isEmpty()
+            && matchesScoreCard.getScoreCard().get(0).getScoreDetails() != null
+            && matchesScoreCard.getScoreCard().get(0).getScoreDetails().getOvers() != 0) {
 
             body.append("\n <b><h3 style='colour: blue'>")
                 .append(matchesScoreCard.getMatchHeader().getTeam1().getName()).append(" vs ")
@@ -130,8 +160,12 @@ public class SendAlertsService {
                 body.append("</label>")
                         .append("</h3>");
             }
+            return body;
         }
-        return body;
+        else{
+            return null;
+        }
+
     }
 
     private String getScore(MatchScoreCard matchesScoreCard, int index) {
