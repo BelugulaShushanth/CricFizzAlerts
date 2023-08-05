@@ -31,7 +31,7 @@ public class CricfizzAlertsKafkaConsumer {
     public void consumeAlertDetails(String alertDetailsJson){
         try {
             AlertDetails alertDetails = cricAlertUtils.objectMapper().readValue(alertDetailsJson, AlertDetails.class);
-            logger.info("Alert Received: {}",cricAlertUtils.objectMapper().writeValueAsString(alertDetails));
+            logger.info("Alert Received: {}",alertDetails.getAlertId());
             alertsRepository.save(alertDetails);
             logger.info("Alert: {} saved",alertDetails.getAlertId());
             sendAlertsService.scheduleMailAlerts(alertDetails);

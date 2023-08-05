@@ -35,9 +35,17 @@ public class AlertDetails {
     @Column("seriesId")
     private Long seriesId;
 
+    @CassandraType(type = CassandraType.Name.TEXT)
+    @Column("seriesName")
+    private String seriesName;
+
     @CassandraType(type = CassandraType.Name.INT)
     @Column("matchId")
     private Long matchId;
+
+    @CassandraType(type = CassandraType.Name.TEXT)
+    @Column("matchName")
+    private String matchName;
 
     @CassandraType(type = CassandraType.Name.TEXT)
     @Column("alertType")
