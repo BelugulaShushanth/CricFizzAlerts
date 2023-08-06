@@ -11,13 +11,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -50,43 +45,56 @@ public class SendAlertsService {
     //@Async
     public void scheduleMailAlerts(AlertDetails alertDetails) {
 
-        TimerTask task = new TimerTask() {
-            @Override
-            public void run() {
-                if(alertsRepository.findById(alertDetails.getAlertId()).get().getIsActive()) {
-                    if (alertDetails.getAlertType().equalsIgnoreCase("score")) {
+        try {
 
-                        if(alertDetails.getMatchType().equalsIgnoreCase("live") ) {
-                            sendMailAlert(alertDetails);
+            TimerTask task = new TimerTask() {
+                @Override
+                public void run() {
+                    if (alertsRepository.findById(alertDetails.getAlertId()).get().getIsActive()) {
+                        if (alertDetails.getAlertType().equalsIgnoreCase("score")) {
+
+                            if (alertDetails.getMatchType().equalsIgnoreCase("live")) {
+                                sendMailAlert(alertDetails);
+                            } else if (alertDetails.getMatchType().equalsIgnoreCase("upcoming")) {
+                                sendMailAlert(alertDetails);
+                            }
                         }
-                        else if (alertDetails.getMatchType().equalsIgnoreCase("upcoming")){
-                            sendMailAlert(alertDetails);
-                        }
+                    } else {
+                        cancel();
                     }
                 }
-                else{
-                    cancel();
-                }
+            };
+
+            Timer timer = new Timer();
+            if (alertDetails.getMatchType().equalsIgnoreCase("upcoming")) {
+
+                long timeDifference = cricAlertUtils.findTimeDifference(alertDetails.getMatchStartDT());
+
+                timer.scheduleAtFixedRate(task, timeDifference, alertDetails.getTimePeriod() * 60000);
+                String dateTime = cricAlertUtils.mapMillsToDateTime(alertDetails.getMatchStartDT());
+                sendAlertScheduledMail(alertDetails,dateTime);
+                logger.info("Alert Scheduled for alertId {} and it starts at Date {} In Mills {}",alertDetails.getAlertId()
+                        ,dateTime,timeDifference);
+            } else {
+                timer.scheduleAtFixedRate(task, 0, alertDetails.getTimePeriod() * 60000);
+                logger.info("Alert Scheduled for alertId {} and it starts now", alertDetails.getAlertId());
             }
-        };
 
-        Timer timer = new Timer();
-        if (alertDetails.getMatchType().equalsIgnoreCase("upcoming")){
-
-            long timeDifference = cricAlertUtils.findTimeDifference(alertDetails.getMatchStartDT());
-
-            timer.scheduleAtFixedRate(task, timeDifference,alertDetails.getTimePeriod() * 60000);
-
-            logger.info("Alert Scheduled for alertId {} and it starts at Date {} In Mills {}"
-                                                        ,alertDetails.getAlertId()
-                                                        ,cricAlertUtils.mapMillsToDateTime(alertDetails.getMatchStartDT())
-                                                        ,timeDifference);
-        }
-        else{
-            timer.scheduleAtFixedRate(task, 0,alertDetails.getTimePeriod() * 60000);
-            logger.info("Alert Scheduled for alertId {} and it starts now",alertDetails.getAlertId());
+        }catch (Exception e){
+            logger.error("Exception in SendAlertsService:scheduleMailAlerts() : {}",e.getMessage());
         }
 
+    }
+
+    private void sendAlertScheduledMail(AlertDetails alertDetails, String dateTime) {
+        MailBean mailBean = new MailBean();
+        mailBean.setToMailId(alertDetails.getMailId());
+        mailBean.setSubject(finalSubject.replace("alertType", alertDetails.getAlertType()));
+        mailBean.setBody("<h4>Dear user, this is from cricfizz</h4>\n"+
+                        "<h3>Alert Scheduled for</h3><br> <label><b>Series: </b> "+alertDetails.getSeriesName()+ "</label>"+
+                        "<br><label><b>Match: </b> "+alertDetails.getMatchName()+"</label>"+
+                        "<br><label><b>Starts At: </b> "+dateTime+"</label>");
+        mailClient.sendMail(mailBean);
     }
 
     private void sendMailAlert(AlertDetails alertDetails) {
