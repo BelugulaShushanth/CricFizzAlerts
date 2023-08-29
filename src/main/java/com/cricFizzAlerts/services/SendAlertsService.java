@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.Timer;
@@ -42,11 +43,10 @@ public class SendAlertsService {
     @Autowired
     private CricAlertUtils cricAlertUtils;
 
-    //@Async
+    @Async
     public void scheduleMailAlerts(AlertDetails alertDetails) {
 
         try {
-
             TimerTask task = new TimerTask() {
                 @Override
                 public void run() {
@@ -54,12 +54,20 @@ public class SendAlertsService {
                         if (alertDetails.getAlertType().equalsIgnoreCase("score")) {
 
                             if (alertDetails.getMatchType().equalsIgnoreCase("live")) {
-                                sendMailAlert(alertDetails);
+                                if(!sendMailAlert(alertDetails)){
+                                    logger.info("Alert: {} deactivated",alertDetails.getAlertId());
+                                    cancel();
+                                }
                             } else if (alertDetails.getMatchType().equalsIgnoreCase("upcoming")) {
-                                sendMailAlert(alertDetails);
+                                if(!sendMailAlert(alertDetails)){
+                                    logger.info("Alert: {} deactivated",alertDetails.getAlertId());
+                                    cancel();
+                                }
                             }
                         }
                     } else {
+                        sendAlertCancelMail(alertDetails);
+                        logger.info("Alert: {} deactivated",alertDetails.getAlertId());
                         cancel();
                     }
                 }
@@ -97,25 +105,40 @@ public class SendAlertsService {
         mailClient.sendMail(mailBean);
     }
 
-    private void sendMailAlert(AlertDetails alertDetails) {
+    private void sendAlertCancelMail(AlertDetails alertDetails) {
+        MailBean mailBean = new MailBean();
+        mailBean.setToMailId(alertDetails.getMailId());
+        mailBean.setSubject(finalSubject.replace("alertType", alertDetails.getAlertType()));
+        mailBean.setBody("<h4>Dear user, this is from cricfizz</h4>\n"+
+                "<h3>Alert Deactivated for</h3><br> <label><b>Series: </b> "+alertDetails.getSeriesName()+ "</label>"+
+                "<br><label><b>Match: </b> "+alertDetails.getMatchName()+"</label>");
+        mailClient.sendMail(mailBean);
+    }
+
+    private boolean sendMailAlert(AlertDetails alertDetails) {
 
         MatchScoreCard matchesScoreCard = cricbuzzService.getMatchesScoreCard(alertDetails.getMatchId());
-        StringBuffer mailId = new StringBuffer(alertDetails.getMailId());
-        String subject = finalSubject;
+        if(matchesScoreCard.getMatchHeader().getState().equalsIgnoreCase("In Progress")) {
+            StringBuffer mailId = new StringBuffer(alertDetails.getMailId());
+            String subject = finalSubject;
 
-        MailBean mailBean = new MailBean();
-        mailBean.setToMailId(mailId.toString());
-        mailBean.setSubject(subject.replace("alertType", alertDetails.getAlertType()));
+            MailBean mailBean = new MailBean();
+            mailBean.setToMailId(mailId.toString());
+            mailBean.setSubject(subject.replace("alertType", alertDetails.getAlertType()));
 
-        StringBuffer mailBody = getBody(finalBody, matchesScoreCard);
+            StringBuffer mailBody = getBody(finalBody, matchesScoreCard);
 
-        if(mailBody != null) {
-            mailBean.setBody(mailBody.toString());
-            ResponseEntity<String> response = mailClient.sendMail(mailBean);
-            if (response.getStatusCode().is2xxSuccessful()) {
-                logger.info("Alert {} sent successfully to {}", alertDetails.getAlertId(), alertDetails.getMailId());
+            if (mailBody != null) {
+                mailBean.setBody(mailBody.toString());
+                ResponseEntity<String> response = mailClient.sendMail(mailBean);
+                if (response.getStatusCode().is2xxSuccessful()) {
+                    logger.info("Alert {} sent successfully to {}", alertDetails.getAlertId(), alertDetails.getMailId());
+                }
             }
+            return true;
         }
+
+        return false;
     }
 
     private StringBuffer getBody(String finalBody, MatchScoreCard matchesScoreCard) {

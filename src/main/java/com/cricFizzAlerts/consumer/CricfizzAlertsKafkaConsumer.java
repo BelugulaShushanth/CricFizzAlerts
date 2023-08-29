@@ -13,6 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 @Component
 public class CricfizzAlertsKafkaConsumer {
 
@@ -31,10 +33,13 @@ public class CricfizzAlertsKafkaConsumer {
     public void consumeAlertDetails(String alertDetailsJson){
         try {
             AlertDetails alertDetails = cricAlertUtils.objectMapper().readValue(alertDetailsJson, AlertDetails.class);
-            logger.info("Alert Received: {}",alertDetails.getAlertId());
+            logger.info("Alert Received: {} Alert Status: {}",alertDetails.getAlertId(),alertDetails.getIsActive());
             alertsRepository.save(alertDetails);
-            logger.info("Alert: {} saved",alertDetails.getAlertId());
-            sendAlertsService.scheduleMailAlerts(alertDetails);
+            logger.info("Alert: {} Saved/Updated",alertDetails.getAlertId());
+            if(alertDetails.getIsActive()) {
+                sendAlertsService.scheduleMailAlerts(alertDetails);
+            }
+
         } catch (JsonProcessingException e) {
             logger.error("Exception in parsing alertDetailsJson: {}",e.getMessage());
         }

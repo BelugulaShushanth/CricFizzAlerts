@@ -7,9 +7,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-@FeignClient("MAILING-SERVICE")
+@FeignClient(value = "api-gateway")
 public interface MailClient {
 
-    @PostMapping("/api/mail/sendMail")
+    @PostMapping("/mailing-service/api/mail/sendMail")
     ResponseEntity<String> sendMail(@RequestBody MailBean mailBean);
 }
