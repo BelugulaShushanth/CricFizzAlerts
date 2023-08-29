@@ -63,7 +63,25 @@ public class CricbuzzService {
         }
         catch (Exception e){
             logger.error("Exception in CricBuzzService:getMatches", e);
+            if(checkKeyExpired(e)){
+                matchScoreCard = getMatchesScoreCard(matchId);
+            }
         }
         return matchScoreCard;
+    }
+
+    private boolean checkKeyExpired(Exception e) {
+        logger.info("Limit Exceeded Trying for next keys");
+        if(e.getMessage().contains("429")){
+            if(CricAlertUtils.keyIndex < CricAlertUtils.maxKeys) {
+                CricAlertUtils.keyIndex += 1;
+            }
+            else{
+                CricAlertUtils.keyIndex=0;
+            }
+            return true;
+        }
+
+        return false;
     }
 }
